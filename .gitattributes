@@ -4,3 +4,5 @@
 *.mp4 binary
 *.ply binary
 viewer/index.js binary
+viewer/index.js linguist-vendored
+viewer/index.css linguist-vendored
