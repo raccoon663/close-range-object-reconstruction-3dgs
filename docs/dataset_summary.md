@@ -1,6 +1,8 @@
 # Capture summary
 
-Every source photograph was decoded and inspected without modification.
+The historical capture audit reports that every source photograph was decoded
+and inspected without modification. The private originals are not available in
+this checkout for repeating the EXIF and source-hash checks below.
 
 | Elevation ring | Images | Size |
 |---|---:|---:|
@@ -24,18 +26,24 @@ High sensitivity and relatively slow shutter speeds explain part of the visible 
 
 ## Split and registration
 
-The deterministic source split reserved views around each orbit.
+The historical notes describe a deterministic source reservation around each
+orbit, but the original filename lists and selection rule are not committed.
 
-| Ring | Training | Source-level holdout |
+| Ring | Selected for pose recovery/training preparation | Reserved capture frames |
 |---|---:|---:|
 | lower | 81 | 7 |
 | middle | 69 | 6 |
 | upper | 97 | 8 |
 | **Total** | **247** | **21** |
 
-All 247 training images were registered after exhaustive matching and pose extension. The resulting sparse model contains 21,035 points.
+The final historical model reports 247 registered images after exhaustive
+matching and an additional unrecovered pose-extension stage, with 21,035 sparse
+points. The automated baseline alone does not establish this result.
 
-The 21 source-level holdout images do not have recovered poses and are not the same as Nerfstudio's interval evaluation views. No metric from the interval split is presented as a strict source-level holdout result.
+The 21 reserved capture images do not have recovered poses and were not
+quantitatively evaluated. Nerfstudio's interval evaluation views are selected
+within the 247 posed images, reducing the actual optimization subset. No interval
+metric is presented as an independent reserved-capture result.
 
 ## Public sample
 

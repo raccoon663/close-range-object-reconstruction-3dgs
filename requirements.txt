@@ -1,0 +1,6 @@
+# Lightweight preparation, cleanup and plotting. Historical versions of these
+# libraries were not recorded; these are compatibility bounds, not a lockfile.
+numpy>=1.26,<3
+Pillow>=10.1
+plyfile>=1.0,<2
+matplotlib>=3.8

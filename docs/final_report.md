@@ -2,7 +2,15 @@
 
 ## Camera recovery
 
-The 247 training photographs cover lower, middle, and upper orbit rings. Sequential matching produced several disconnected models. Exhaustive matching improved within-ring connectivity, after which image registration and bundle adjustment produced one model containing all 247 inputs and 21,035 sparse points.
+The 247 source-selected photographs cover lower, middle, and upper orbit rings.
+Historical notes report fragmented sequential/exhaustive reconstruction and a
+later connected 247-camera, 21,035-point model. The table calls this additional
+stage “pose extension”. Its exact commands, registration strategy, manual
+interventions (if any) and intermediate states could not be recovered from the
+published history or the scoped local project-folder search. Registration and
+bundle adjustment are named in the original notes, but their sequence and inputs
+are not specified. `run_colmap.py` implements the automated baseline only and
+must not be presented as independently reproducing the final connected model.
 
 A simple image-count reduction was not successful:
 
@@ -21,6 +29,12 @@ Box-prompted SAM2 masks isolated the figurine in each training view. Supplying t
 
 The final cleanup projects every Gaussian center into the registered cameras. For views in which the point projects inside the image, the procedure records whether the projected pixel lies inside the foreground mask. A point is retained when at least 80% of its valid projections agree with the foreground.
 
+This is the historical method description, not a recovered implementation.
+The new [cleanup script](../scripts/clean_gaussians_multiview.py) adds a configurable
+minimum valid-view count (default 3), positive-depth checks, explicit coordinate
+transforms, lens distortion and scaled-mask lookup. Its synthetic tests do not
+establish agreement with the historical counts below. See [cleanup.md](cleanup.md).
+
 | Representation | Gaussians |
 |---|---:|
 | half-resolution object model before cleanup | 73,653 |
@@ -28,6 +42,22 @@ The final cleanup projects every Gaussian center into the registered cameras. Fo
 | valid entries written to the PLY | 19,118 |
 
 This rule removes most of the table and room while preserving the base, tail, wings, and head across the orbit.
+
+That assessment refers to the published visual result. Only the final PLY's
+19,118 finite vertices can currently be verified from committed data. The
+intermediate 73,653 and 19,165 counts remain historical reports, and the 47-entry
+export difference lacks an attributable log. No new cleanup/ablation was run on
+the historical model. A center-only silhouette test cannot resolve depth
+occlusion, Gaussian extent, false background support or threshold sensitivity.
+
+## Evaluation split
+
+There are 268 source images, 247 selected for camera recovery/training preparation,
+and 21 unposed reserved capture frames. The latter were not quantitatively
+evaluated. Nerfstudio's interval split uses every 14th posed image from the 247
+and is distinct from the source reservation. No independent novel-view metrics
+or PSNR/SSIM/LPIPS values are available in the repository. Cleanup using evaluation
+masks would also make those views unsuitable for an untouched evaluation.
 
 ## Visual assessment
 

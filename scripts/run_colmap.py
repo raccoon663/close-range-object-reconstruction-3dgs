@@ -9,25 +9,37 @@ import shutil
 import time
 from pathlib import Path
 
-import pycolmap
+from image_list import read_image_list
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--images", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--image-list", "--manifest", dest="image_list", type=Path, required=True,
+                        help="selected_images.txt: relative filenames, one per line (--manifest is a legacy alias)")
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--max-image-size", type=int, default=2000)
     parser.add_argument("--matcher", choices=["sequential", "exhaustive"], default="sequential")
     parser.add_argument("--fresh", action="store_true")
     args = parser.parse_args()
 
+    image_names = read_image_list(args.image_list, args.images)
+    if args.max_image_size < 1:
+        parser.error("--max-image-size must be positive")
+    workspace = args.workspace.resolve()
+    # --fresh may clear generated state, never the input data, source list or repository.
+    protected = [args.images.resolve(), args.image_list.resolve(), Path(__file__).resolve().parents[1]]
+    if workspace.is_relative_to(args.images.resolve()) or any(p == workspace or p.is_relative_to(workspace) for p in protected):
+        parser.error("Workspace must not contain the input images, image list or repository")
+    if workspace.exists() and any(workspace.iterdir()) and not args.fresh:
+        parser.error("Workspace is not empty; choose a new directory or explicitly use --fresh")
+    import pycolmap
+
     database = args.workspace / "database.db"
     sparse = args.workspace / "sparse"
     if args.fresh and args.workspace.exists():
         shutil.rmtree(args.workspace)
     sparse.mkdir(parents=True, exist_ok=True)
-    image_names = [line.strip() for line in args.manifest.read_text(encoding="utf-8").splitlines() if line.strip()]
     started = time.time()
 
     extraction = pycolmap.FeatureExtractionOptions()
@@ -90,6 +102,8 @@ def main():
     }
     (args.workspace / "reconstruction_summary.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2), flush=True)
+    if not models:
+        raise RuntimeError("No reconstruction produced; inspect matching and capture overlap")
 
 
 if __name__ == "__main__":

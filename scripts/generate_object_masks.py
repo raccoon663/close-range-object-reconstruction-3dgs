@@ -6,21 +6,32 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from ultralytics import SAM
+from image_list import read_image_list
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate object masks with a SAM 2 box prompt.")
     parser.add_argument("--images", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--image-list", "--manifest", dest="image_list", type=Path, required=True,
+                        help="selected_images.txt: one relative filename per line; legacy --manifest remains accepted")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--output-downscaled", type=Path, required=True)
     parser.add_argument("--model", type=Path, default=Path("sam2.1_t.pt"))
     parser.add_argument("--downscale", type=int, default=2)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--device", default="0", help="Ultralytics device, e.g. 0 or cpu")
     args = parser.parse_args()
 
-    names = [line.strip() for line in args.manifest.read_text(encoding="utf-8").splitlines() if line.strip()]
+    names = read_image_list(args.image_list, args.images)
+    if args.downscale < 1:
+        parser.error("--downscale must be positive")
+    roots = [p.resolve() for p in (args.images, args.output, args.output_downscaled)]
+    if any(a == b or a.is_relative_to(b) or b.is_relative_to(a)
+           for i, a in enumerate(roots) for b in roots[i+1:]):
+        parser.error("Image and mask directories must not overlap")
+    if not args.model.is_file():
+        parser.error("SAM2 weights not found; obtain the documented weights and pass --model")
+    from ultralytics import SAM
     model = SAM(str(args.model))
     preview_rows: list[Image.Image] = []
     areas: list[float] = []
@@ -29,17 +40,22 @@ def main() -> None:
         source = args.images / name
         image = Image.open(source).convert("RGB")
         width, height = image.size
+        if min(width, height) < args.downscale:
+            raise ValueError(f"Downscale exceeds image dimensions: {name}")
         full_path = (args.output / name).with_suffix(".png")
         small_path = (args.output_downscaled / name).with_suffix(".png")
         if full_path.exists() and small_path.exists() and not args.force:
             mask = Image.open(full_path).convert("L")
+            with Image.open(small_path) as small:
+                if mask.size != image.size or small.size != (width // args.downscale, height // args.downscale):
+                    raise ValueError(f"Cached mask size mismatch for {name}; regenerate with --force")
             mask_array = np.asarray(mask) > 0
         else:
             box = [0.25 * width, 0.06 * height, 0.75 * width, 0.96 * height]
             result = model(
                 str(source),
                 bboxes=box,
-                device=0,
+                device=args.device,
                 retina_masks=True,
                 verbose=False,
             )[0]
@@ -49,13 +65,15 @@ def main() -> None:
                     bboxes=box,
                     points=[0.5 * width, 0.48 * height],
                     labels=[1],
-                    device=0,
+                    device=args.device,
                     retina_masks=True,
                     verbose=False,
                 )[0]
             if result.masks is None or len(result.masks.data) == 0:
                 raise RuntimeError(f"No mask returned for {name}")
             mask_array = result.masks.data[0].cpu().numpy() > 0.5
+            if mask_array.shape != (height, width):
+                raise ValueError(f"SAM mask dimensions differ from source image: {name}")
             mask = Image.fromarray(mask_array.astype(np.uint8) * 255)
             full_path.parent.mkdir(parents=True, exist_ok=True)
             small_path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +81,8 @@ def main() -> None:
             mask.resize((width // args.downscale, height // args.downscale), Image.Resampling.NEAREST).save(
                 small_path, optimize=True
             )
+        if not np.isin(np.asarray(mask), [0, 255]).all() or not mask_array.any():
+            raise ValueError(f"Empty or nonbinary mask for {name}; review the prompt or regenerate cached masks")
         areas.append(float(mask_array.mean()))
 
         if index % max(1, len(names) // 12) == 0:
@@ -90,7 +110,8 @@ def main() -> None:
 
     summary = {
         "images": len(names),
-        "model": str(args.model),
+        "model": args.model.name,
+        "device": args.device,
         "box_ratios_xyxy": [0.25, 0.06, 0.75, 0.96],
         "mean_mask_fraction": float(np.mean(areas)),
         "min_mask_fraction": float(np.min(areas)),
