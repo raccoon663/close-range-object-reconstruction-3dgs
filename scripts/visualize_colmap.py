@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from colmap_text import read_views
 
 
 def qvec_to_rot(q):
@@ -22,15 +23,7 @@ def qvec_to_rot(q):
 
 
 def read_cameras(path):
-    cameras = []
-    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.startswith("#")]
-    for line in lines[::2]:
-        fields = line.split()
-        q = np.array([float(x) for x in fields[1:5]])
-        t = np.array([float(x) for x in fields[5:8]])
-        center = -(qvec_to_rot(q).T @ t)
-        cameras.append((center, fields[9].split("/")[0]))
-    return cameras
+    return [(-(v.rotation.T @ v.translation), v.name.split("/")[0]) for v in read_views(path)]
 
 
 def read_points(path):
@@ -41,12 +34,12 @@ def read_points(path):
         fields = line.split()
         xyz.append([float(x) for x in fields[1:4]])
         rgb.append([int(x) / 255 for x in fields[4:7]])
-    return np.asarray(xyz), np.asarray(rgb)
+    return np.asarray(xyz).reshape(-1, 3), np.asarray(rgb).reshape(-1, 3)
 
 
 def equal_axes(ax, values):
     center = (values.min(axis=0) + values.max(axis=0)) / 2
-    radius = np.max(values.max(axis=0) - values.min(axis=0)) / 2
+    radius = max(np.max(values.max(axis=0) - values.min(axis=0)) / 2, 1e-6)
     for setter, c in zip((ax.set_xlim, ax.set_ylim, ax.set_zlim), center):
         setter(c - radius, c + radius)
 
