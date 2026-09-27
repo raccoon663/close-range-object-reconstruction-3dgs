@@ -3,11 +3,17 @@ data/
 outputs/
 checkpoints/
 *.ckpt
+*.pt
+*.pth
+*.safetensors
+weights/
+raw_data/
 
 # Python environments and caches
 .venv/
 .train-venv/
 __pycache__/
+.pytest_cache/
 *.py[cod]
 .torch-cache/
 .mpl-cache/

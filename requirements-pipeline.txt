@@ -1,0 +1,7 @@
+-r requirements.txt
+# Recorded historical versions, not a complete tested environment lock.
+pycolmap==3.13.0
+nerfstudio==1.1.5
+# Exact historical Ultralytics version was not recorded.
+ultralytics>=8.3
+# Install platform-specific torch/torchvision/gsplat separately; see environment.md.
