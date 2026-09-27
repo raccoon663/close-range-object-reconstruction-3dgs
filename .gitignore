@@ -1,0 +1,20 @@
+# Training data and generated state
+data/
+outputs/
+checkpoints/
+*.ckpt
+
+# Python environments and caches
+.venv/
+.train-venv/
+__pycache__/
+*.py[cod]
+.torch-cache/
+.mpl-cache/
+.localappdata/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
