@@ -23,11 +23,9 @@ The main difficulty is foreground separation. Masked training alone still leaves
 
 The cleaned Gaussian Splat is in [model/dragon_object_half_clean.ply](model/dragon_object_half_clean.ply). A rendered orbit is in [assets/dragon_orbit.mp4](assets/dragon_orbit.mp4).
 
-These are historical run results, except the final PLY count/size, which can be
-checked directly. The automated 247-image baseline registered 245 images across
-four models (largest 150); the final connected model required an additional
-“pose extension” stage whose implementation/state is unavailable. The new cleanup
-script has not been shown to reproduce the reported intermediate counts.
+The final camera model required an additional pose-extension step beyond the
+automated baseline. See [experiment notes](docs/final_report.md) for registration
+results and [reproduction status](docs/reproduction.md) for unavailable run state.
 
 <p align="center">
   <img src="assets/side.png" width="48%" alt="Side view of the reconstruction">
@@ -54,8 +52,8 @@ Eighteen evenly spaced, metadata-stripped sample frames are included in [sample_
 
 ## Method
 
-1. Audit the 268 photographs and reserve 21 source-level capture frames.
-2. Run PyCOLMAP with exhaustive matching; the historical final connected model additionally required an unrecovered pose-extension stage.
+1. Select 247 photographs and reserve 21 capture frames.
+2. Recover cameras with PyCOLMAP exhaustive matching and additional pose extension.
 3. Generate foreground silhouettes from box-prompted SAM2 masks.
 4. Train Nerfstudio Splatfacto at half resolution with the masks supplied to the data parser.
 5. Project Gaussian centers into the registered views and measure foreground support.
@@ -63,9 +61,9 @@ Eighteen evenly spaced, metadata-stripped sample frames are included in [sample_
 
 ```mermaid
 flowchart LR
-    A[Three-ring capture] --> B[Image audit]
+    A[Three-ring capture] --> B[Image selection]
     B --> C[COLMAP registration]
-    C --> H[Additional pose extension: historical gap]
+    C --> H[Additional pose extension]
     H --> D[Foreground masks]
     D --> E[Splatfacto training]
     E --> F[Multi-view silhouette test]
@@ -81,20 +79,11 @@ The mask review sheet and recovered camera layout provide two checks on the prep
 
 ## Reproduction
 
-Follow the [complete reproduction workflow](docs/reproduction.md): prepare images
-and `train_images.txt` → automated camera recovery → inspect/resolve disconnected
-models → SAM2 masks → prepare the Nerfstudio COLMAP layout → train only for a new
-experiment → export PLY → cleanup with the recorded coordinate transform → viewer.
-`--manifest` remains an alias for `--image-list`; the public sample CSV is metadata,
-not a training filename list.
-
-| Component | Reproduction status |
-|---|---|
-| Published PLY, renders and viewer | Available for direct inspection |
-| Automated baseline, masks, visualization | Scripts available; full data and SAM2 weights required |
-| Data preparation and cleanup | New implementations with synthetic tests, not recovered historical code |
-| Final pose extension | Procedure and intermediate model unavailable |
-| Historical training/export | Settings documented; checkpoint, exact lists and parser transform unavailable |
+Follow the [complete workflow](docs/reproduction.md) for image selection
+(`selected_images.txt`), camera recovery, SAM2 masks, Nerfstudio data preparation,
+training, export and cleanup. The public sample CSV contains provenance metadata.
+Full reconstruction requires the original images and external SAM2 weights;
+the guide documents the missing historical steps and artifacts.
 
 Install lightweight dependencies with `python -m pip install -r requirements.txt`.
 The GPU pipeline needs the additional platform-specific setup described in
@@ -106,17 +95,16 @@ and open `http://localhost:8000/viewer/`.
 
 ## Reconstruction and cleanup
 
-The historical threshold was foreground support ≥ 0.80. The reimplementation adds
+Cleanup uses foreground support ≥ 0.80 and
 `valid_views >= min_valid_views` (default 3, configurable). It explicitly maps
 Nerfstudio PLY coordinates back to the COLMAP world frame, applies world-to-camera
 poses and lens distortion, and samples the corresponding full-frame masks.
-It preserves retained PLY attributes and writes a new diagnostic artifact.
-See [coordinate conventions and limitations](docs/cleanup.md).
+It preserves retained PLY attributes. The new implementation is documented in
+[cleanup details](docs/cleanup.md); exact historical counts have not been reproduced.
 
 This is a center-projection silhouette heuristic, not visibility-aware volumetric
 segmentation. It does not test Gaussian extent or occlusion; background geometry
 can receive false support. Both thresholds and mask quality affect the result.
-The published PLY has not been replaced.
 
 ## Repository structure
 
@@ -150,8 +138,8 @@ is not a watertight mesh, and has no geometric ground truth.
 The 21 reserved capture frames have no recovered poses and were not used for
 independent novel-view metrics. Nerfstudio's every-14th-image evaluation is a
 separate split within the 247 posed images. No PSNR, SSIM, LPIPS or geometric
-accuracy is reported. Exact historical reproduction remains limited by the
-private originals and missing intermediate state; see the [audit](docs/audit.md).
+accuracy is reported. Further limitations are documented in the
+[model card](MODEL_CARD.md) and [reproduction guide](docs/reproduction.md).
 
 A stronger capture would use diffuse fixed lighting, a matte neutral background, locked focus and exposure, lower ISO, and deliberate bridge views between elevation rings.
 
@@ -159,8 +147,6 @@ A stronger capture would use diffuse fixed lighting, a matte neutral background,
 
 COLMAP / PyCOLMAP, Nerfstudio Splatfacto, gsplat, SAM2, PyTorch, Pillow, and NumPy.
 
-The interactive engine is the vendored SuperSplat / PlayCanvas viewer, not an
-engine authored for this project. Its [MIT license](viewer/SUPERSPLAT_LICENSE.txt)
-is retained; [viewer provenance](viewer/README.md) identifies the bundled assets.
-The project contribution is reconstruction, foreground isolation, cleanup and
-deployment. See the project [license](LICENSE) and [model card](MODEL_CARD.md).
+Interactive visualization uses the SuperSplat / PlayCanvas viewer under its
+[MIT license](viewer/SUPERSPLAT_LICENSE.txt). See [viewer provenance](viewer/README.md)
+and the project [license](LICENSE).

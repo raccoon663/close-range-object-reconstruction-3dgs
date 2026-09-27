@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import numpy as np
-from PIL import Image
+from PIL import Image, JpegImagePlugin
 from plyfile import PlyData, PlyElement
 import pytest
 
@@ -126,7 +126,7 @@ def test_cli_preserves_attributes_and_refuses_overwrite(tmp_path):
 
 @pytest.mark.parametrize("contents", ["", "../outside.jpg\n", "a.jpg\na.jpg\n", "C:/private.jpg\n"])
 def test_image_list_rejects_invalid(tmp_path, contents):
-    path = tmp_path / "train_images.txt"
+    path = tmp_path / "selected_images.txt"
     path.write_text(contents)
     with pytest.raises(ValueError):
         read_image_list(path, tmp_path)
@@ -168,11 +168,16 @@ def test_prepare_dataset(tmp_path):
     (images / "ring").mkdir(parents=True)
     Image.new("RGB", (8, 8)).save(images / "ring/0.jpg")
     Image.new("L", (8, 8), 255).save(masks / "ring/0.png")
-    image_list = tmp_path / "train_images.txt"
+    image_list = tmp_path / "selected_images.txt"
     image_list.write_text("ring/0.jpg\n")
     output = tmp_path / "prepared"
     result = subprocess.run([sys.executable, str(SCRIPTS / "prepare_nerfstudio_data.py"), "--images", str(images), "--image-list", str(image_list), "--masks", str(masks), "--colmap-model", str(model), "--output", str(output)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert Image.open(output / "images_2/ring/0.jpg").size == (4, 4)
+    with Image.open(output / "images_2/ring/0.jpg") as jpeg:
+        assert JpegImagePlugin.get_sampling(jpeg) == 0
+        # IJG luminance quantization at quality 95: catches default-quality saves.
+        assert jpeg.quantization[0][:8] == [2, 1, 1, 2, 2, 4, 5, 6]
+    assert (output / "images/ring/0.jpg").read_bytes() == (images / "ring/0.jpg").read_bytes()
     assert Image.open(output / "masks_2/ring/0.png").size == (4, 4)
     assert (output / "colmap/sparse/0/images.txt").read_bytes() == (model / "images.txt").read_bytes()

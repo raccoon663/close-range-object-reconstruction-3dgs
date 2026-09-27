@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--images", type=Path, required=True)
     parser.add_argument("--image-list", "--manifest", dest="image_list", type=Path, required=True,
-                        help="train_images.txt: relative filenames, one per line (--manifest is a legacy alias)")
+                        help="selected_images.txt: relative filenames, one per line (--manifest is a legacy alias)")
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--max-image-size", type=int, default=2000)
     parser.add_argument("--matcher", choices=["sequential", "exhaustive"], default="sequential")

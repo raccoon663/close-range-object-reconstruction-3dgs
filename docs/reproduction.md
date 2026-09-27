@@ -9,7 +9,7 @@ training run was performed during this audit.
 ## 1. Inputs and environment
 
 Install the appropriate dependencies from [environment.md](environment.md).
-Obtain your source images and create `train_images.txt`, one relative filename
+Obtain your source images and create `selected_images.txt`, one relative filename
 per line (for example `lower/DSC05268.JPG`). Preserve order and subdirectories.
 The exact historical 247-name list and 21-name reserved list are not committed;
 the ring counts alone do not reconstruct that selection. Record your own lists.
@@ -24,7 +24,7 @@ Commands are shown on one line for both PowerShell and POSIX shells. Replace
 the illustrative paths with actual inputs.
 
 ```text
-python scripts/run_colmap.py --images raw_data/images --image-list train_images.txt --workspace outputs/colmap --matcher exhaustive
+python scripts/run_colmap.py --images raw_data/images --image-list selected_images.txt --workspace outputs/colmap --matcher exhaustive
 ```
 
 Use a fresh workspace for each experiment. `--fresh` explicitly deletes the
@@ -61,7 +61,7 @@ a GPU index. Review all masks, especially thin and transparent parts; the fixed
 box prompt was chosen for this capture and is not a general object detector.
 
 ```text
-python scripts/generate_object_masks.py --images raw_data/images --image-list train_images.txt --output data/masks --output-downscaled data/masks_2 --downscale 2 --model weights/sam2.1_t.pt --device 0
+python scripts/generate_object_masks.py --images raw_data/images --image-list selected_images.txt --output data/masks --output-downscaled data/masks_2 --downscale 2 --model weights/sam2.1_t.pt --device 0
 ```
 
 Inspect `data/mask_review.jpg` and `data/mask_summary.json`. Cached masks are
@@ -70,14 +70,16 @@ reused unless `--force`; regenerate when inputs, weights or prompts change.
 ## 4. Prepare the COLMAP-parser layout
 
 The new utility copies the selected text model and full images/masks, then
-resizes images with Lanczos and masks with nearest-neighbor sampling. Camera
+resizes images with Lanczos and masks with nearest-neighbor sampling. Downscaled
+JPEGs use explicit quality 95 and 4:4:4 chroma sampling (`subsampling=0`), avoiding
+Pillow's lower-quality JPEG defaults. PNG masks remain lossless. Camera
 dimensions must match the originals. It requires the model and list to contain
 exactly the same image names, so fragmented output cannot silently pass as full
 registration. The exact historical image-conversion/resampling procedure was
 not recorded; these new resizes are not claimed pixel-identical.
 
 ```text
-python scripts/prepare_nerfstudio_data.py --images raw_data/images --image-list train_images.txt --colmap-model outputs/colmap/sparse_text/0 --masks data/masks --output data/nerfstudio/dragon --downscale 2
+python scripts/prepare_nerfstudio_data.py --images raw_data/images --image-list selected_images.txt --colmap-model outputs/colmap/sparse_text/0 --masks data/masks --output data/nerfstudio/dragon --downscale 2
 ```
 
 The result contains `images/`, `images_2/`, `masks/`, `masks_2/` and

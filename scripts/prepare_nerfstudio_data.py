@@ -53,7 +53,11 @@ def main():
             shutil.copy2(root / rel, target)
             with Image.open(root / rel) as im:
                 size = tuple(v // args.downscale for v in im.size)
-                im.resize(size, method).save(small)
+                resized = im.resize(size, method)
+                if folder == "images" and rel.suffix.lower() in {".jpg", ".jpeg"}:
+                    resized.save(small, quality=95, subsampling=0)
+                else:
+                    resized.save(small)
     model_target = args.output / "colmap" / "sparse" / "0"
     model_target.mkdir(parents=True)
     for path in model_files:

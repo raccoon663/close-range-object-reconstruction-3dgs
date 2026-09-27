@@ -13,7 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate object masks with a SAM 2 box prompt.")
     parser.add_argument("--images", type=Path, required=True)
     parser.add_argument("--image-list", "--manifest", dest="image_list", type=Path, required=True,
-                        help="train_images.txt: one relative filename per line; legacy --manifest remains accepted")
+                        help="selected_images.txt: one relative filename per line; legacy --manifest remains accepted")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--output-downscaled", type=Path, required=True)
     parser.add_argument("--model", type=Path, default=Path("sam2.1_t.pt"))

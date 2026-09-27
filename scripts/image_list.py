@@ -12,7 +12,7 @@ def relative_name(name: str) -> str:
 
 def read_image_list(path: Path, images: Path) -> list[str]:
     if path.suffix.lower() == ".csv":
-        raise ValueError("Use train_images.txt: one relative filename per line; sample manifest.csv is metadata.")
+        raise ValueError("Use selected_images.txt: one relative filename per line; sample manifest.csv is metadata.")
     names = [relative_name(s.strip()) for s in path.read_text(encoding="utf-8-sig").splitlines() if s.strip()]
     if not names or len(set(names)) != len(names):
         raise ValueError("Image list must be nonempty and contain no duplicate names")
