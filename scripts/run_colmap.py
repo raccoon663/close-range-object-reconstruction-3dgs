@@ -96,7 +96,7 @@ def main():
         "pycolmap": pycolmap.__version__,
         "matcher": args.matcher,
         "max_image_size": args.max_image_size,
-        "training_images": len(image_names),
+        "selected_images": len(image_names),
         "elapsed_seconds": round(time.time() - started, 1),
         "models": summaries,
     }
