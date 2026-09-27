@@ -13,15 +13,21 @@ The main difficulty is foreground separation. Masked training alone still leaves
 | Stage | Result |
 |---|---:|
 | Source capture | 268 photographs, 7008 × 4672 |
-| Structure from motion | 247 / 247 training views registered |
+| Final camera model (after additional pose extension) | 247 / 247 source-selected views registered |
 | Sparse reconstruction | 21,035 points |
 | 3DGS training | 3504 × 2336, 30,000 iterations |
 | Gaussians before silhouette cleanup | 73,653 |
 | Gaussians retained at 0.80 support | 19,165 |
 | Valid Gaussians in exported PLY | 19,118 |
-| Clean model size | 4.52 MB |
+| Clean model size | 4,742,856 bytes (4.52 MiB) |
 
 The cleaned Gaussian Splat is in [model/dragon_object_half_clean.ply](model/dragon_object_half_clean.ply). A rendered orbit is in [assets/dragon_orbit.mp4](assets/dragon_orbit.mp4).
+
+These are historical run results, except the final PLY count/size, which can be
+checked directly. The automated 247-image baseline registered 245 images across
+four models (largest 150); the final connected model required an additional
+“pose extension” stage whose implementation/state is unavailable. The new cleanup
+script has not been shown to reproduce the reported intermediate counts.
 
 <p align="center">
   <img src="assets/side.png" width="48%" alt="Side view of the reconstruction">
@@ -48,8 +54,8 @@ Eighteen evenly spaced, metadata-stripped sample frames are included in [sample_
 
 ## Method
 
-1. Audit the 268 photographs and reserve 21 source-level holdout frames.
-2. Recover a connected camera model with PyCOLMAP and exhaustive feature matching.
+1. Audit the 268 photographs and reserve 21 source-level capture frames.
+2. Run PyCOLMAP with exhaustive matching; the historical final connected model additionally required an unrecovered pose-extension stage.
 3. Generate foreground silhouettes from box-prompted SAM2 masks.
 4. Train Nerfstudio Splatfacto at half resolution with the masks supplied to the data parser.
 5. Project Gaussian centers into the registered views and measure foreground support.
@@ -59,7 +65,8 @@ Eighteen evenly spaced, metadata-stripped sample frames are included in [sample_
 flowchart LR
     A[Three-ring capture] --> B[Image audit]
     B --> C[COLMAP registration]
-    C --> D[Foreground masks]
+    C --> H[Additional pose extension: historical gap]
+    H --> D[Foreground masks]
     D --> E[Splatfacto training]
     E --> F[Multi-view silhouette test]
     F --> G[Clean Gaussian Splat PLY]
@@ -74,35 +81,86 @@ The mask review sheet and recovered camera layout provide two checks on the prep
 
 ## Reproduction
 
-The repository keeps the scripts used for image registration, mask generation, half-resolution training, and COLMAP visualization. Paths are passed as arguments or resolved relative to the repository.
+Follow the [complete reproduction workflow](docs/reproduction.md): prepare images
+and `train_images.txt` → automated camera recovery → inspect/resolve disconnected
+models → SAM2 masks → prepare the Nerfstudio COLMAP layout → train only for a new
+experiment → export PLY → cleanup with the recorded coordinate transform → viewer.
+`--manifest` remains an alias for `--image-list`; the public sample CSV is metadata,
+not a training filename list.
 
-```powershell
-# Structure from motion
-python scripts/run_colmap.py `
-  --images <path-to-images> `
-  --manifest <path-to-training-manifest> `
-  --workspace outputs/colmap `
-  --matcher exhaustive --fresh
+| Component | Reproduction status |
+|---|---|
+| Published PLY, renders and viewer | Available for direct inspection |
+| Automated baseline, masks, visualization | Scripts available; full data and SAM2 weights required |
+| Data preparation and cleanup | New implementations with synthetic tests, not recovered historical code |
+| Final pose extension | Procedure and intermediate model unavailable |
+| Historical training/export | Settings documented; checkpoint, exact lists and parser transform unavailable |
 
-# Foreground masks
-python scripts/generate_object_masks.py `
-  --images <path-to-images> `
-  --manifest <path-to-training-manifest> `
-  --output data/masks `
-  --output-downscaled data/masks_2 --downscale 2
+Install lightweight dependencies with `python -m pip install -r requirements.txt`.
+The GPU pipeline needs the additional platform-specific setup described in
+[docs/environment.md](docs/environment.md). Run synthetic tests with
+`python -m pip install pytest` then `python -m pytest -q`.
 
-# 3DGS training
-powershell -ExecutionPolicy Bypass -File scripts/train_object_half.ps1
+To inspect the published result, run `python -m http.server 8000` from the root
+and open `http://localhost:8000/viewer/`.
+
+## Reconstruction and cleanup
+
+The historical threshold was foreground support ≥ 0.80. The reimplementation adds
+`valid_views >= min_valid_views` (default 3, configurable). It explicitly maps
+Nerfstudio PLY coordinates back to the COLMAP world frame, applies world-to-camera
+poses and lens distortion, and samples the corresponding full-frame masks.
+It preserves retained PLY attributes and writes a new diagnostic artifact.
+See [coordinate conventions and limitations](docs/cleanup.md).
+
+This is a center-projection silhouette heuristic, not visibility-aware volumetric
+segmentation. It does not test Gaussian extent or occlusion; background geometry
+can receive false support. Both thresholds and mask quality affect the result.
+The published PLY has not been replaced.
+
+## Repository structure
+
+```text
+.
+├── assets/                 # Renders, mask review, sparse overview, orbit video
+├── docs/                   # Capture, environment, provenance and reproduction
+├── model/                  # Published Gaussian PLY
+├── sample_data/            # 18 reduced images and source-provenance CSV
+├── scripts/
+│   ├── run_colmap.py
+│   ├── generate_object_masks.py
+│   ├── prepare_nerfstudio_data.py
+│   ├── train_object_half.ps1
+│   ├── clean_gaussians_multiview.py
+│   └── visualize_colmap.py
+├── tests/                  # Synthetic geometry and IO regression tests
+└── viewer/                 # Vendored SuperSplat/PlayCanvas viewer
 ```
-
-The original photographs, model weights, virtual environments, training checkpoints, and background-inclusive baseline export are excluded. See [docs/environment.md](docs/environment.md) and [docs/final_report.md](docs/final_report.md) for the exact run configuration and experiment notes.
 
 ## Limitations
 
-The transparent gold accessory and glossy plastic produce view-dependent highlights that do not satisfy a simple Lambertian scene assumption. High ISO, slow shutter speeds, and shallow depth of field also limit source sharpness. Unseen surfaces and mask boundaries can appear soft or contain small floating splats. The exported representation is a Gaussian Splat rather than a watertight polygon mesh.
+Transparent and strongly specular surfaces produce sharp view-dependent effects
+that are difficult to represent consistently with finite-order spherical-harmonic
+color. 3DGS supports view-dependent appearance; this does not fully solve
+transparency or specular reconstruction. High ISO, slow shutter speeds, and shallow
+depth of field also limit source sharpness. Unseen surfaces and mask boundaries
+can appear soft or contain small floating splats. The result has no metric scale,
+is not a watertight mesh, and has no geometric ground truth.
+
+The 21 reserved capture frames have no recovered poses and were not used for
+independent novel-view metrics. Nerfstudio's every-14th-image evaluation is a
+separate split within the 247 posed images. No PSNR, SSIM, LPIPS or geometric
+accuracy is reported. Exact historical reproduction remains limited by the
+private originals and missing intermediate state; see the [audit](docs/audit.md).
 
 A stronger capture would use diffuse fixed lighting, a matte neutral background, locked focus and exposure, lower ISO, and deliberate bridge views between elevation rings.
 
 ## Software
 
 COLMAP / PyCOLMAP, Nerfstudio Splatfacto, gsplat, SAM2, PyTorch, Pillow, and NumPy.
+
+The interactive engine is the vendored SuperSplat / PlayCanvas viewer, not an
+engine authored for this project. Its [MIT license](viewer/SUPERSPLAT_LICENSE.txt)
+is retained; [viewer provenance](viewer/README.md) identifies the bundled assets.
+The project contribution is reconstruction, foreground isolation, cleanup and
+deployment. See the project [license](LICENSE) and [model card](MODEL_CARD.md).
