@@ -94430,7 +94430,12 @@ const loadGsplat = async (app, config, progressCallback, cancelled) => {
                 unified: true,
                 asset
             });
-            app.root.addChild(entity);
+            // Display-only correction: this Nerfstudio splat is Z-up; orbit controls are Y-up.
+            // Attach before resolving so framing, picking and clipping use corrected bounds.
+            const displayRoot = new Entity('splat display root', app);
+            displayRoot.setLocalEulerAngles(-90, 0, 0);
+            app.root.addChild(displayRoot);
+            displayRoot.addChild(entity);
             resolve(entity);
         });
         let watermark = 0;
